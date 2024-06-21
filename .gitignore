@@ -23,3 +23,5 @@ go.work.sum
 
 # Emacs backup files
 *~
+__debug_*
+main
