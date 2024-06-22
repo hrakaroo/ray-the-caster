@@ -6,19 +6,39 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+type environment struct {
+	width  int32
+	height int32
+	area   [100]int16
+}
+
 func main() {
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
 
-	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 800, 600, sdl.WINDOW_SHOWN)
+	env := environment{
+		width:  600,
+		height: 600,
+		area: [100]int16{
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 0, 0, 1, 0, 0, 0, 0, 0, 1,
+			1, 0, 0, 1, 0, 0, 0, 0, 0, 1,
+			1, 0, 0, 1, 0, 0, 0, 0, 0, 1,
+			1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+			1, 0, 0, 0, 0, 1, 1, 0, 0, 1,
+			1, 0, 0, 0, 0, 1, 1, 0, 0, 1,
+			1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+			1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	}
+
+	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, env.width, env.height, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
 	}
 	defer window.Destroy()
-
-	//  SDL_Renderer * renderer = SDL_CreateRenderer(window, -1, 0);
 
 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
 	if err != nil {
@@ -27,9 +47,9 @@ func main() {
 	}
 	defer renderer.Destroy()
 
-	rect := sdl.Rect{X: 10, Y: 10, W: 5, H: 5}
+	player := sdl.Rect{X: 150, Y: 150, W: 5, H: 5}
 
-	render(renderer, &rect)
+	render(renderer, &env, &player)
 
 	running := true
 	for running {
@@ -49,19 +69,19 @@ func main() {
 				switch keyCode {
 				case sdl.K_RIGHT:
 					// fmt.Println("Right")
-					rect.X += 5
+					player.X += 5
 				case sdl.K_LEFT:
 					// fmt.Println("Left")
-					rect.X -= 5
+					player.X -= 5
 				case sdl.K_UP:
 					// fmt.Println("Forward")
-					rect.Y -= 5
+					player.Y -= 5
 				case sdl.K_DOWN:
 					// fmt.Println("Backward")
-					rect.Y += 5
+					player.Y += 5
 				}
 
-				render(renderer, &rect)
+				render(renderer, &env, &player)
 
 			}
 		}
@@ -70,13 +90,31 @@ func main() {
 	}
 }
 
-func render(renderer *sdl.Renderer, rect *sdl.Rect) {
+func render(renderer *sdl.Renderer, env *environment, player *sdl.Rect) {
+
+	// I'm nearly positive this is not the most efficient way to do this, but I'm not super
+	//  interested in hyper optimizing the actual drawing. SDL is just a tool here
 
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
+	// Draw the map
+	xUnit := env.width / 10
+	yUnit := env.height / 10
+	renderer.SetDrawColor(255, 255, 255, 255)
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			value := env.area[y*10+x]
+			if value == 1 {
+				// Draw a wall box
+				rect := sdl.Rect{X: int32(x*int(xUnit)) + 1, Y: int32(y*int(yUnit)) + 1, W: xUnit - 2, H: yUnit - 2}
+				renderer.FillRect(&rect)
+			}
+		}
+	}
+
 	renderer.SetDrawColor(0, 255, 0, 255)
-	renderer.FillRect(rect)
+	renderer.FillRect(player)
 
 	// renderer.SetDrawColor(255, 255, 255, 255)
 	// renderer.DrawPoint(150, 300)
