@@ -6,8 +6,9 @@ Simple Ray Caster in SDL
 
 * (DONE) Get basic character (box) moving around the screen
 * (DONE) Render walls
-* Add direction line to character
-* Render ray casting rays
+* (DONE) Add direction line to character
+* (DONE) Motion in direction
+* Draw ray casting rays
 * Render 3D
 
 ## Notes & Useful Links

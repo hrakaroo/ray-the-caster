@@ -2,14 +2,65 @@ package main
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-type environment struct {
+const PI = 3.14159265
+const PI2 = PI * 2
+
+type Environment struct {
 	width  int32
 	height int32
 	area   [100]int16
+}
+
+type Player struct {
+	x          int32
+	y          int32
+	width      int32
+	height     int32
+	direction  float32
+	directionX float32
+	directionY float32
+}
+
+func NewPlayer() *Player {
+	direction := 0.0
+	directionX := float32(math.Cos(direction))
+	directionY := float32(math.Sin(direction))
+
+	return &Player{x: 150, y: 150, width: 6, height: 6,
+		direction: float32(direction), directionX: directionX, directionY: directionY}
+}
+
+func (p *Player) Left() {
+	p.direction -= 0.15
+	if p.direction < 0 {
+		p.direction = PI2
+	}
+	p.directionX = float32(math.Cos(float64(p.direction)))
+	p.directionY = float32(math.Sin(float64(p.direction)))
+}
+
+func (p *Player) Right() {
+	p.direction += 0.15
+	if p.direction > PI2 {
+		p.direction = 0
+	}
+	p.directionX = float32(math.Cos(float64(p.direction)))
+	p.directionY = float32(math.Sin(float64(p.direction)))
+}
+
+func (p *Player) Forward() {
+	p.x += int32(p.directionX * 4)
+	p.y += int32(p.directionY * 4)
+}
+
+func (p *Player) Backward() {
+	p.x -= int32(p.directionX * 4)
+	p.y -= int32(p.directionY * 4)
 }
 
 func main() {
@@ -18,7 +69,7 @@ func main() {
 	}
 	defer sdl.Quit()
 
-	env := environment{
+	env := Environment{
 		width:  600,
 		height: 600,
 		area: [100]int16{
@@ -47,9 +98,9 @@ func main() {
 	}
 	defer renderer.Destroy()
 
-	player := sdl.Rect{X: 150, Y: 150, W: 5, H: 5}
+	pl := NewPlayer()
 
-	render(renderer, &env, &player)
+	render(renderer, &env, pl)
 
 	running := true
 	for running {
@@ -68,20 +119,16 @@ func main() {
 
 				switch keyCode {
 				case sdl.K_RIGHT:
-					// fmt.Println("Right")
-					player.X += 5
+					pl.Right()
 				case sdl.K_LEFT:
-					// fmt.Println("Left")
-					player.X -= 5
+					pl.Left()
 				case sdl.K_UP:
-					// fmt.Println("Forward")
-					player.Y -= 5
+					pl.Forward()
 				case sdl.K_DOWN:
-					// fmt.Println("Backward")
-					player.Y += 5
+					pl.Backward()
 				}
 
-				render(renderer, &env, &player)
+				render(renderer, &env, pl)
 
 			}
 		}
@@ -90,7 +137,7 @@ func main() {
 	}
 }
 
-func render(renderer *sdl.Renderer, env *environment, player *sdl.Rect) {
+func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 
 	// I'm nearly positive this is not the most efficient way to do this, but I'm not super
 	//  interested in hyper optimizing the actual drawing. SDL is just a tool here
@@ -113,8 +160,13 @@ func render(renderer *sdl.Renderer, env *environment, player *sdl.Rect) {
 		}
 	}
 
+	// Draw our player
 	renderer.SetDrawColor(0, 255, 0, 255)
-	renderer.FillRect(player)
+	rect := sdl.Rect{X: pl.x - pl.width/2, Y: pl.y - pl.height/2, W: pl.width, H: pl.height}
+	renderer.FillRect(&rect)
+
+	// Draw the direction vector
+	renderer.DrawLine(pl.x, pl.y, pl.x+int32(int32(pl.directionX*15.0)), pl.y+int32(pl.directionY*15.0))
 
 	// renderer.SetDrawColor(255, 255, 255, 255)
 	// renderer.DrawPoint(150, 300)
