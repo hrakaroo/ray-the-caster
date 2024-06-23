@@ -8,7 +8,8 @@ Simple Ray Caster in SDL
 * (DONE) Render walls
 * (DONE) Add direction line to character
 * (DONE) Motion in direction
-* Draw ray casting rays
+* (DONE) Draw single casting ray
+* Draw Field of View casting rays
 * Render 3D
 
 ## Notes & Useful Links
