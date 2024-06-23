@@ -224,11 +224,13 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	xBox := env.xIndex(pl.X)
 	yBox := env.yIndex(pl.Y)
 
-	// collisionX, collisionY, collisionAngle := detectCollision(pl.X, pl.Y, boxX, boxY, pl.Angle, env.Area)
-	xCollision, yCollision, _ := detectCollision(pl.X, pl.Y, xBox, yBox, pl.Angle, env)
-
 	renderer.SetDrawColor(255, 0, 0, 255)
-	renderer.DrawLine(pl.X, pl.Y, xCollision, yCollision)
+	for i := -0.5; i < 0.5; i += 0.01 {
+		// collisionX, collisionY, collisionAngle := detectCollision(pl.X, pl.Y, boxX, boxY, pl.Angle, env.Area)
+		xCollision, yCollision, _, _ := detectCollision(pl.X, pl.Y, xBox, yBox, pl.Angle+i, env)
+
+		renderer.DrawLine(pl.X, pl.Y, xCollision, yCollision)
+	}
 
 	// renderer.SetDrawColor(255, 255, 255, 255)
 	// renderer.DrawPoint(150, 300)
@@ -258,7 +260,7 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	// sdl.Delay(16)
 }
 
-func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment) (collisionX int32, collisionY int32, collisionAngle float32) {
+func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment) (collisionX int32, collisionY int32, collisionDistance int32, collisionAngle float64) {
 
 	var xSave, ySave, distance int32
 	distance = 100_000_000
@@ -391,5 +393,5 @@ func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment
 			}
 		}
 	}
-	return xSave, ySave, 0
+	return xSave, ySave, int32(math.Sqrt(float64(distance))), 0
 }
