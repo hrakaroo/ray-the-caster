@@ -8,8 +8,7 @@ import (
 )
 
 const PI = 3.1415926535
-const PI2 = PI * 2
-const Nothing = 100_000
+const PI2 = PI * 2.0
 
 type Environment struct {
 	PixelWidth  int32
@@ -63,23 +62,17 @@ func (e *Environment) areaValue(xIndex, yIndex int) int16 {
 	return e.Area[yIndex*int(e.UnitHeight)+xIndex]
 }
 
-func (e *Environment) yIndex(yLoc int32) int {
-	if yLoc < 0 {
-		return -1
-	}
-	return int(yLoc / e.ySize)
+func (e *Environment) yIndex(yLoc float64) int {
+	return int(int32(yLoc) / e.ySize)
 }
 
-func (e *Environment) xIndex(xLoc int32) int {
-	if xLoc < 0 {
-		return -1
-	}
-	return int(xLoc / e.xSize)
+func (e *Environment) xIndex(xLoc float64) int {
+	return int(int32(xLoc) / e.xSize)
 }
 
 type Player struct {
-	X      int32
-	Y      int32
+	X      float64
+	Y      float64
 	Width  int32
 	Height int32
 	Angle  float64
@@ -115,13 +108,13 @@ func (p *Player) Right() {
 }
 
 func (p *Player) Forward() {
-	p.X += int32(math.Round(p.DeltaX * 4.0))
-	p.Y += int32(math.Round(p.DeltaY * 4.0))
+	p.X += p.DeltaX * 4.0
+	p.Y += p.DeltaY * 4.0
 }
 
 func (p *Player) Backward() {
-	p.X -= int32(math.Round(p.DeltaX * 4.0))
-	p.Y -= int32(math.Round(p.DeltaY * 4.0))
+	p.X -= p.DeltaX * 4.0
+	p.Y -= p.DeltaY * 4.0
 }
 
 func main() {
@@ -213,12 +206,12 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 
 	// Draw our player
 	renderer.SetDrawColor(0, 255, 0, 255)
-	rect := sdl.Rect{X: pl.X - pl.Width/2, Y: pl.Y - pl.Height/2, W: pl.Width, H: pl.Height}
+	rect := sdl.Rect{X: int32(pl.X) - pl.Width/2, Y: int32(pl.Y) - pl.Height/2, W: pl.Width, H: pl.Height}
 	renderer.FillRect(&rect)
 
 	// Draw the direction vector
 	// It's a unit vector so multiply it by 15 (selected at random)
-	renderer.DrawLine(pl.X, pl.Y, pl.X+int32(int32(pl.DeltaX*15.0)), pl.Y+int32(pl.DeltaY*15.0))
+	renderer.DrawLine(int32(pl.X), int32(pl.Y), int32(pl.X+pl.DeltaX*15.0), int32(pl.Y+pl.DeltaY*15.0))
 
 	// Determine the xBox the player is in
 	xBox := env.xIndex(pl.X)
@@ -226,10 +219,9 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 
 	renderer.SetDrawColor(255, 0, 0, 255)
 	for i := -0.5; i < 0.5; i += 0.01 {
-		// collisionX, collisionY, collisionAngle := detectCollision(pl.X, pl.Y, boxX, boxY, pl.Angle, env.Area)
-		xCollision, yCollision, _, _ := detectCollision(pl.X, pl.Y, xBox, yBox, pl.Angle+i, env)
+		xCollision, yCollision, _, _ := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+i, env)
 
-		renderer.DrawLine(pl.X, pl.Y, xCollision, yCollision)
+		renderer.DrawLine(int32(pl.X), int32(pl.Y), xCollision, yCollision)
 	}
 
 	// renderer.SetDrawColor(255, 255, 255, 255)
@@ -260,32 +252,29 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	// sdl.Delay(16)
 }
 
-func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment) (collisionX int32, collisionY int32, collisionDistance int32, collisionAngle float64) {
+func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environment) (collisionX int32, collisionY int32, collisionDistance int32, collisionAngle float64) {
 
-	var xSave, ySave, distance int32
+	var xSave, ySave, distance float64
 	distance = 100_000_000
-
-	// fmt.Printf("boxX %d, boxY %d\n", boxX, boxY)
-	// fmt.Printf("Box %d, %d\n", xBox, yBox)
 
 	yMax := int(env.PixelHeight / env.UnitHeight)
 	xMax := int(env.PixelWidth / env.UnitWidth)
 
-	// fmt.Printf("Angle: %f\n", angle)
 	tan := math.Tan(float64(angle))
 
+	// Normalize the angle
+	for angle > PI2 {
+		angle -= PI2
+	}
+
 	if angle > 0 && angle < PI {
-		fmt.Println("Positive Y")
+		// fmt.Println("Positive Y")
 
 		// We want to find the intersection with the line below us which is owned by yBox+1
 		for i := yBox + 1; i < yMax; i++ {
-			yDelta := env.yLoc(i) - y
+			yDelta := float64(env.yLoc(i)) - y
+			xDelta := yDelta / tan
 
-			// Add a small amount (0.0001) to yDelta to "push" the xDelta into the box.  Otherwise
-			//  roundoff could cause xIndex to report the wrong box
-			xDelta := int32(((float64(yDelta) + 0.0001) / tan))
-
-			// Convert the
 			xIndex := env.xIndex(x + xDelta)
 			yIndex := env.yIndex(y + yDelta)
 
@@ -304,20 +293,18 @@ func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment
 			}
 		}
 	} else if angle > PI && angle < PI2 {
-		fmt.Println("Negative Y")
+		// fmt.Println("Negative Y")
 
 		// We want to find the intersection with the line above us which is owned by yBox
 		for i := yBox; i >= 0; i-- {
-			yDelta := env.yLoc(i) - y
-
-			// Compute the xDelta, subtract 0.0001 to counter roundoff
-			xDelta := int32(((float64(yDelta) - 0.0001) / tan))
+			yDelta := float64(env.yLoc(i)) - y
+			xDelta := yDelta / tan
 
 			xIndex := env.xIndex(x + xDelta)
-			// We are facing the top of the screen so we want the box just above the line
-			yIndex := env.yIndex(y + yDelta - 1)
+			yIndex := env.yIndex(y + yDelta)
 
-			// fmt.Printf("yDelta: %d, xDelta: %d, xIndex: %d, yIndex: %d\n", yDelta, xDelta, xIndex, yIndex)
+			// Since yIndex is going to be on the line, the lines in front of us belong to the cubes in front of them.
+			yIndex--
 
 			value := env.areaValue(xIndex, yIndex)
 			if value == 1 {
@@ -336,19 +323,17 @@ func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment
 	}
 
 	if angle > PI/2 && angle < 6*PI/4 {
-		fmt.Println("Negative X")
+		// fmt.Println("Negative X")
 		// We want to find the intersection with the line before us which is owned by xBox
 		for i := xBox; i >= 0; i-- {
-			xDelta := env.xLoc(i) - x
+			xDelta := float64(env.xLoc(i)) - x
 
 			// Compute the yDelta, subtract 0.0001 to counter roundoff
-			yDelta := int32(((float64(xDelta) - 0.0001) * tan))
+			yDelta := xDelta * tan
 
-			xIndex := env.xIndex(x + xDelta - 1)
-			// We are facing the top of the screen so we want the box just above the line
+			xIndex := env.xIndex(x + xDelta)
 			yIndex := env.yIndex(y + yDelta)
-
-			// fmt.Printf("yDelta: %d, xDelta: %d, xIndex: %d, yIndex: %d\n", yDelta, xDelta, xIndex, yIndex)
+			xIndex--
 
 			value := env.areaValue(xIndex, yIndex)
 			if value == 1 {
@@ -364,17 +349,13 @@ func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment
 				break
 			}
 		}
-	} else {
-		fmt.Println("Positive X")
+	} else if angle < PI/2 || angle > 6*PI/4 {
+		// fmt.Println("Positive X")
 		// We want to find the intersection with the line below us which is owned by yBox+1
 		for i := xBox + 1; i < xMax; i++ {
-			xDelta := env.yLoc(i) - x
+			xDelta := float64(env.yLoc(i)) - x
+			yDelta := xDelta * tan
 
-			// Add a small amount (0.0001) to yDelta to "push" the xDelta into the box.  Otherwise
-			//  roundoff could cause xIndex to report the wrong box
-			yDelta := int32(((float64(xDelta) + 0.0001) * tan))
-
-			// Convert the
 			xIndex := env.xIndex(x + xDelta)
 			yIndex := env.yIndex(y + yDelta)
 
@@ -393,5 +374,5 @@ func detectCollision(x, y int32, xBox, yBox int, angle float64, env *Environment
 			}
 		}
 	}
-	return xSave, ySave, int32(math.Sqrt(float64(distance))), 0
+	return int32(xSave), int32(ySave), int32(math.Sqrt(float64(distance))), 0
 }
