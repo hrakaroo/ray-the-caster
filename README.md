@@ -23,4 +23,5 @@ Simple Ray Caster in SDL
 
 ## Images
 
-[Ray casting in 2D](./img1.png)
+Ray casting in 2D
+![Ray casting in 2D](./img1.png)
