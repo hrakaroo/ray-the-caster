@@ -10,7 +10,6 @@ Simple Ray Caster in SDL
 * (DONE) Motion in direction
 * (DONE) Draw single casting ray
 * (DONE) Draw Field of View casting rays
-* Fix intersections with exact corners
 * Render 3D
 
 ## Notes & Useful Links

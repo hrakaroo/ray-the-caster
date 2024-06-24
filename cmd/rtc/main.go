@@ -7,8 +7,13 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+const FieldOfViewDegrees = 30
+const IncrementsDegrees = 1
+
 const PI = 3.1415926535
 const PI2 = PI * 2.0
+const FieldOfViewRads = PI * FieldOfViewDegrees / 180
+const IncrementsRads = PI * IncrementsDegrees / 180
 
 type Environment struct {
 	PixelWidth  int32
@@ -125,7 +130,7 @@ func main() {
 
 	env := NewEnvironment()
 
-	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, env.PixelWidth, env.PixelHeight, sdl.WINDOW_SHOWN)
+	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 2*env.PixelWidth, env.PixelHeight, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
 	}
@@ -147,7 +152,6 @@ func main() {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch t := event.(type) {
 			case *sdl.QuitEvent:
-				println("Quit")
 				running = false
 			case *sdl.KeyboardEvent:
 				keyCode := t.Keysym.Sym
@@ -178,12 +182,45 @@ func main() {
 }
 
 func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
-
-	// I'm nearly positive this is not the most efficient way to do this, but I'm not super
-	//  interested in hyper optimizing the actual drawing. SDL is just a tool here
-
-	renderer.SetDrawColor(0, 0, 0, 255)
+	renderer.SetDrawColor(100, 100, 100, 255)
 	renderer.Clear()
+
+	renderer.SetViewport(&sdl.Rect{X: 0, Y: 0, W: env.PixelWidth, H: env.PixelHeight})
+	render2D(renderer, env, pl)
+
+	renderer.SetViewport(&sdl.Rect{X: env.PixelWidth + 1, Y: 0, W: env.PixelHeight, H: env.PixelHeight})
+	render3D(renderer, env, pl)
+
+	renderer.Present()
+}
+
+func render3D(renderer *sdl.Renderer, env *Environment, pl *Player) {
+
+	// Determine the xBox the player is in
+	xBox := env.xIndex(pl.X)
+	yBox := env.yIndex(pl.Y)
+
+	// 30 degrees of view
+	renderer.SetDrawColor(255, 0, 0, 255)
+	width := env.PixelWidth * IncrementsDegrees / FieldOfViewDegrees
+
+	x := 0
+	for offset := -FieldOfViewRads / 2; offset < FieldOfViewRads/2; offset += IncrementsRads {
+		_, _, distance, _ := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+offset, env)
+
+		height := float64(env.PixelHeight) / math.Log10(distance)
+
+		y := (float64(env.PixelHeight) - height) / 2.0
+		renderer.FillRect(&sdl.Rect{X: int32(x), Y: int32(y), W: width, H: int32(height)})
+
+		x += int(width)
+	}
+}
+
+func render2D(renderer *sdl.Renderer, env *Environment, pl *Player) {
+
+	// I'm sure this is not the most efficient way to do this, but I'm not super
+	//  interested in hyper optimizing the actual drawing. SDL is just a tool here
 
 	// Draw the map
 	xUnit := env.PixelWidth / env.UnitWidth
@@ -209,18 +246,14 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	rect := sdl.Rect{X: int32(pl.X) - pl.Width/2, Y: int32(pl.Y) - pl.Height/2, W: pl.Width, H: pl.Height}
 	renderer.FillRect(&rect)
 
-	// Draw the direction vector
-	// It's a unit vector so multiply it by 15 (selected at random)
-	renderer.DrawLine(int32(pl.X), int32(pl.Y), int32(pl.X+pl.DeltaX*15.0), int32(pl.Y+pl.DeltaY*15.0))
-
 	// Determine the xBox the player is in
 	xBox := env.xIndex(pl.X)
 	yBox := env.yIndex(pl.Y)
 
 	renderer.SetDrawColor(255, 0, 0, 255)
-	for i := -0.5; i < 0.5; i += 0.01 {
-		xCollision, yCollision, _, _ := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+i, env)
 
+	for offset := -FieldOfViewRads / 2; offset < FieldOfViewRads/2; offset += IncrementsRads {
+		xCollision, yCollision, _, _ := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+offset, env)
 		renderer.DrawLine(int32(pl.X), int32(pl.Y), xCollision, yCollision)
 	}
 
@@ -248,13 +281,12 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	// renderer.SetDrawColor(255, 0, 255, 255)
 	// renderer.FillRects(rects)
 
-	renderer.Present()
 	// sdl.Delay(16)
 }
 
-func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environment) (collisionX int32, collisionY int32, collisionDistance int32, collisionAngle float64) {
+func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environment) (collisionX int32, collisionY int32, collisionDistance, collisionAngle float64) {
 
-	var xSave, ySave, distance float64
+	var xSave, ySave, angleSave, distance float64
 	distance = 100_000_000
 
 	yMax := int(env.PixelHeight / env.UnitHeight)
@@ -265,6 +297,9 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 	// Normalize the angle
 	for angle > PI2 {
 		angle -= PI2
+	}
+	for angle < 0 {
+		angle += PI2
 	}
 
 	if angle > 0 && angle < PI {
@@ -287,6 +322,7 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 				if dist < distance {
 					xSave = x + xDelta
 					ySave = y + yDelta
+					angleSave = angle
 					distance = dist
 				}
 				break
@@ -315,6 +351,7 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 				if dist < distance {
 					xSave = x + xDelta
 					ySave = y + yDelta
+					angleSave = angle
 					distance = dist
 				}
 				break
@@ -344,6 +381,7 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 				if dist < distance {
 					xSave = x + xDelta
 					ySave = y + yDelta
+					angleSave = angle
 					distance = dist
 				}
 				break
@@ -374,5 +412,5 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 			}
 		}
 	}
-	return int32(xSave), int32(ySave), int32(math.Sqrt(float64(distance))), 0
+	return int32(xSave), int32(ySave), math.Sqrt(distance), angleSave
 }
