@@ -1,37 +1,31 @@
 # Ray The Caster
 
-Simple Ray Caster in SDL
+A (very) simple ray caster using Go and SDL
 
-## General Info
+## Info
 
-I'm not a huge gamer, but I can remember how I felt when I first saw DOOM. I was
-blown away by the immersive feeling and have been hooked on 3D graphics ever
-since. While I normally like to focus on Ray Tracers, I was curious why people
-kept claiming that DOOM (and Wolfenstein3D) were not "true 3D environments". 
-After watching a couple of videos on the making of Wolfenstein3D I decided
-to give a go to creating my own basic Ray Caster.
+Just a fun project to see how hard it would be to create a Wolfenstein3D like 
+ray caster. I have not put much effort into optimization for either CPU or 
+memory as I'm favoring readability over speed. 
 
-I am not hyper optimizing for memory or speed. While I am curious how hard it is
-to get a basic 3D environment working I am favoring readability over
-speed. I don't mind some basic optimizations, but I'm not going to go too
-crazy with it.
-
-I am also not really interested in texture maps, or complex lighting. I really just
-want to create a basic space I can explore and then I'll likely call it good.
+I have also not added texture maps or complex lighting. I may add these at some
+point in the future, but I really just wanted to create a basic space I could
+explore.
 
 ## Build
 
-I decided to write this in Go (since that is what I use most of the time at
-work) with SDL for drawing.  In order to build this you first need to 
+This is in Go (since that is what I use most of the time at work) with SDL 
+for drawing.  In order to build this you first need to 
 
 `brew install sdl2{,_image,_mixer,_ttf,_gfx} pkg-config`
 
-and then you should be able to just build and run it.
+and then you should be able to just build and run the app.
 
 ## Status
 
-I'm mostly done. I still have a fish-eye going on, but I'm not as interested in fixing
-that. I've done what I set out to do. 
+I'm mostly done. The only real remaining issue is a fish-eye with the 
+walls which I may try to fix, but otherwise I'm done with this project
+for now.
 
 ## TODO
 
@@ -43,6 +37,7 @@ that. I've done what I set out to do.
 * (DONE) Draw Field of View casting rays
 * (DONE) Render 3D
 * (DONE) 3D shading using angles
+* Fix fish-eye (?)
 
 ## Notes & Useful Links
 
@@ -54,5 +49,10 @@ that. I've done what I set out to do.
 
 ## Images
 
-Ray casting in 2D
+### Ray casting in 2D
 ![Ray casting in 2D](./img1.png)
+
+### Ray casting in 2D & 3D
+![Ray casting in 2D](./img2.png)
+
+
