@@ -19,6 +19,20 @@ crazy with it.
 I am also not really interested in texture maps, or complex lighting. I really just
 want to create a basic space I can explore and then I'll likely call it good.
 
+## Build
+
+I decided to write this in Go (since that is what I use most of the time at
+work) with SDL for drawing.  In order to build this you first need to 
+
+`brew install sdl2{,_image,_mixer,_ttf,_gfx} pkg-config`
+
+and then you should be able to just build and run it.
+
+## Status
+
+I'm mostly done. I still have a fish-eye going on, but I'm not as interested in fixing
+that. I've done what I set out to do. 
+
 ## TODO
 
 * (DONE) Get basic character (box) moving around the screen
@@ -28,7 +42,7 @@ want to create a basic space I can explore and then I'll likely call it good.
 * (DONE) Draw single casting ray
 * (DONE) Draw Field of View casting rays
 * (DONE) Render 3D
-* 3D shading using angles
+* (DONE) 3D shading using angles
 
 ## Notes & Useful Links
 
