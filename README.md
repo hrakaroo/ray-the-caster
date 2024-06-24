@@ -23,9 +23,9 @@ and then you should be able to just build and run the app.
 
 ## Status
 
-I'm mostly done. The only real remaining issue is a fish-eye with the 
-walls which I may try to fix, but otherwise I'm done with this project
-for now.
+I'm still playing around with some of the color shading and I may 
+go through and do some small optimizations, but for the most part
+I'm done with the main work.
 
 ## TODO
 
@@ -37,7 +37,8 @@ for now.
 * (DONE) Draw Field of View casting rays
 * (DONE) Render 3D
 * (DONE) 3D shading using angles
-* Fix fish-eye (?)
+* (DONE) Remove fish-eye
+* (DONE) 3D shading using distance
 
 ## Notes & Useful Links
 

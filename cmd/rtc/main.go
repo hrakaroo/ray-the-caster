@@ -211,20 +211,20 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	renderer.SetDrawColor(100, 100, 100, 255)
 	renderer.Clear()
 
+	// Determine the xBox the player is in
+	xBox := env.xIndex(pl.X)
+	yBox := env.yIndex(pl.Y)
+
 	renderer.SetViewport(&sdl.Rect{X: 0, Y: 0, W: env.PixelWidth, H: env.PixelHeight})
-	render2D(renderer, env, pl)
+	render2D(renderer, env, pl, xBox, yBox)
 
 	renderer.SetViewport(&sdl.Rect{X: env.PixelWidth + 1, Y: 0, W: env.PixelHeight, H: env.PixelHeight})
-	render3D(renderer, env, pl)
+	render3D(renderer, env, pl, xBox, yBox)
 
 	renderer.Present()
 }
 
-func render3D(renderer *sdl.Renderer, env *Environment, pl *Player) {
-
-	// Determine the xBox the player is in
-	xBox := env.xIndex(pl.X)
-	yBox := env.yIndex(pl.Y)
+func render3D(renderer *sdl.Renderer, env *Environment, pl *Player, xBox, yBox int) {
 
 	// 30 degrees of view
 	width := float64(env.PixelWidth) * IncrementsDegrees / FieldOfViewDegrees
@@ -233,7 +233,32 @@ func render3D(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	for offset := -FieldOfViewRads / 2; offset < FieldOfViewRads/2; offset += IncrementsRads {
 		_, _, distance, color, angle := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+offset, env)
 
-		renderer.SetDrawColor(uint8(float64(color.R)*angle), uint8(float64(color.G)*angle), uint8(float64(color.B)*angle), color.A)
+		// Lessen impact of angle
+		angle = math.Sqrt(angle)
+
+		// Add shading for the angle
+		color.R = uint8(float64(color.R) * angle)
+		color.G = uint8(float64(color.G) * angle)
+		color.B = uint8(float64(color.B) * angle)
+
+		delta := float64(env.PixelWidth) - distance/2
+		if delta < 0 {
+			// This is _so_ far away we should make it black
+			continue
+		}
+
+		// Convert it to a ratio
+		darkness := delta / float64(env.PixelWidth)
+
+		// Darken further away items
+		color.R = uint8(float64(color.R) * darkness)
+		color.G = uint8(float64(color.G) * darkness)
+		color.B = uint8(float64(color.B) * darkness)
+
+		renderer.SetDrawColor(color.R, color.G, color.B, color.A)
+
+		// Fix fish-eye
+		distance *= math.Cos(offset)
 
 		height := float64(env.PixelHeight) / math.Log10(distance)
 
@@ -244,7 +269,7 @@ func render3D(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	}
 }
 
-func render2D(renderer *sdl.Renderer, env *Environment, pl *Player) {
+func render2D(renderer *sdl.Renderer, env *Environment, pl *Player, xBox, yBox int) {
 	// Draw the map
 	xUnit := env.PixelWidth / env.UnitWidth
 	yUnit := env.PixelHeight / env.UnitHeight
@@ -270,10 +295,6 @@ func render2D(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	renderer.SetDrawColor(0, 255, 0, 255)
 	rect := sdl.Rect{X: int32(pl.X) - pl.Width/2, Y: int32(pl.Y) - pl.Height/2, W: pl.Width, H: pl.Height}
 	renderer.FillRect(&rect)
-
-	// Determine the xBox the player is in
-	xBox := env.xIndex(pl.X)
-	yBox := env.yIndex(pl.Y)
 
 	renderer.SetDrawColor(255, 0, 0, 255)
 
