@@ -8,7 +8,7 @@ import (
 )
 
 const FieldOfViewDegrees = 30
-const IncrementsDegrees = 1
+const IncrementsDegrees = .5
 
 const PI = 3.1415926535
 const PI2 = PI * 2.0
@@ -202,7 +202,7 @@ func render3D(renderer *sdl.Renderer, env *Environment, pl *Player) {
 
 	// 30 degrees of view
 	renderer.SetDrawColor(255, 0, 0, 255)
-	width := env.PixelWidth * IncrementsDegrees / FieldOfViewDegrees
+	width := float64(env.PixelWidth) * IncrementsDegrees / FieldOfViewDegrees
 
 	x := 0
 	for offset := -FieldOfViewRads / 2; offset < FieldOfViewRads/2; offset += IncrementsRads {
@@ -211,17 +211,13 @@ func render3D(renderer *sdl.Renderer, env *Environment, pl *Player) {
 		height := float64(env.PixelHeight) / math.Log10(distance)
 
 		y := (float64(env.PixelHeight) - height) / 2.0
-		renderer.FillRect(&sdl.Rect{X: int32(x), Y: int32(y), W: width, H: int32(height)})
+		renderer.FillRect(&sdl.Rect{X: int32(x), Y: int32(y), W: int32(width), H: int32(height)})
 
 		x += int(width)
 	}
 }
 
 func render2D(renderer *sdl.Renderer, env *Environment, pl *Player) {
-
-	// I'm sure this is not the most efficient way to do this, but I'm not super
-	//  interested in hyper optimizing the actual drawing. SDL is just a tool here
-
 	// Draw the map
 	xUnit := env.PixelWidth / env.UnitWidth
 	yUnit := env.PixelHeight / env.UnitHeight
@@ -256,32 +252,6 @@ func render2D(renderer *sdl.Renderer, env *Environment, pl *Player) {
 		xCollision, yCollision, _, _ := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+offset, env)
 		renderer.DrawLine(int32(pl.X), int32(pl.Y), xCollision, yCollision)
 	}
-
-	// renderer.SetDrawColor(255, 255, 255, 255)
-	// renderer.DrawPoint(150, 300)
-
-	// renderer.SetDrawColor(0, 0, 255, 255)
-	// renderer.DrawLine(0, 0, 200, 200)
-
-	// points := []sdl.Point{{0, 0}, {100, 300}, {100, 300}, {200, 0}}
-	// renderer.SetDrawColor(255, 255, 0, 255)
-	// renderer.DrawLines(points)
-
-	// rect := sdl.Rect{300, 0, 200, 200}
-	// renderer.SetDrawColor(255, 0, 0, 255)
-	// renderer.DrawRect(rect)
-
-	// rects := []sdl.Rect{{400, 400, 100, 100}, {550, 350, 200, 200}}
-	// renderer.SetDrawColor(0, 255, 255, 255)
-	// renderer.DrawRects(rects)
-
-	// rect = sdl.Rect{250, 250, 200, 200}
-
-	// rects = []sdl.Rect{{500, 300, 100, 100}, {200, 300, 200, 200}}
-	// renderer.SetDrawColor(255, 0, 255, 255)
-	// renderer.FillRects(rects)
-
-	// sdl.Delay(16)
 }
 
 func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environment) (collisionX int32, collisionY int32, collisionDistance, collisionAngle float64) {
