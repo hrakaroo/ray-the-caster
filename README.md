@@ -21,6 +21,35 @@ for drawing.  In order to build this you first need to
 
 and then you should be able to just build and run the app.
 
+## Usage
+
+Run the ray caster with:
+
+```bash
+./rtc                 # Uses default map (map.txt if available, or hardcoded map)
+./rtc map.txt         # Load specific map file
+./rtc maze.txt        # Load the included maze example
+```
+
+### Map File Format
+
+Map files are text files with the following format:
+- First line: `width height` (space-separated integers)
+- Following lines: space-separated integers representing the map
+  - `0` = empty space
+  - `1` = gray wall  
+  - `2` = green wall
+  - `3` = blue wall
+
+Example:
+```
+16 16
+1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1
+1 0 2 2 0 0 0 0 0 0 0 0 2 2 0 1
+...
+```
+
 ## Status
 
 I'm still playing around with some of the color shading and I may 
