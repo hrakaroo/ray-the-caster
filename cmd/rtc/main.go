@@ -1,19 +1,25 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"math"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-const FieldOfViewDegrees = 30
-const IncrementsDegrees = .5
+// Raycasting configuration constants
+const FieldOfViewDegrees = 30    // Field of view in degrees
+const IncrementDegrees = 0.5     // Angular resolution for ray casting
 
+// Mathematical constants
 const PI = 3.1415926535
 const PI2 = PI * 2.0
-const FieldOfViewRads = PI * FieldOfViewDegrees / 180
-const IncrementsRads = PI * IncrementsDegrees / 180
+const FieldOfViewRadians = PI * FieldOfViewDegrees / 180
+const IncrementRadians = PI * IncrementDegrees / 180
 
 type Color struct {
 	R uint8
@@ -34,27 +40,27 @@ func init() {
 type Environment struct {
 	PixelWidth  int32
 	PixelHeight int32
-	UnitWidth   int32
-	UnitHeight  int32
-	xSize       int32
-	ySize       int32
-	Area        [256]int8
+	MapWidth    int32  // Number of map units horizontally
+	MapHeight   int32  // Number of map units vertically
+	UnitWidth   int32  // Pixel width of each map unit
+	UnitHeight  int32  // Pixel height of each map unit
+	Area        []int8 // Map data (dynamically sized)
 }
 
 func NewEnvironment() *Environment {
-	unitWidth := 16
-	unitHeight := 16
-	xSize := 40
-	ySize := 40
+	unitPixelWidth := 16
+	unitPixelHeight := 16
+	mapWidth := 16
+	mapHeight := 16
 
 	env := &Environment{
-		PixelWidth:  int32(unitWidth * xSize),
-		PixelHeight: int32(unitHeight * ySize),
-		UnitWidth:   int32(unitWidth),
-		UnitHeight:  int32(unitHeight),
-		xSize:       int32(xSize),
-		ySize:       int32(ySize),
-		Area: [256]int8{
+		PixelWidth:  int32(unitPixelWidth * mapWidth),
+		PixelHeight: int32(unitPixelHeight * mapHeight),
+		UnitWidth:   int32(unitPixelWidth),
+		UnitHeight:  int32(unitPixelHeight),
+		MapWidth:    int32(mapWidth),
+		MapHeight:   int32(mapHeight),
+		Area: []int8{
 			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 			1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 			1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
@@ -76,29 +82,118 @@ func NewEnvironment() *Environment {
 	return env
 }
 
-// yLoc returns the y screen location given an y index
-func (e *Environment) yLoc(yIndex int) int32 {
-	return int32(yIndex) * e.ySize
+// LoadEnvironmentFromFile loads a map from a text file
+// File format: first line contains "width height", followed by rows of space-separated integers
+func LoadEnvironmentFromFile(filename string) (*Environment, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open map file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	
+	// Read first line to get dimensions
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("empty map file")
+	}
+	
+	dimensions := strings.Fields(scanner.Text())
+	if len(dimensions) != 2 {
+		return nil, fmt.Errorf("invalid header format, expected 'width height'")
+	}
+	
+	mapWidth, err := strconv.Atoi(dimensions[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid width: %w", err)
+	}
+	
+	mapHeight, err := strconv.Atoi(dimensions[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid height: %w", err)
+	}
+	
+	unitPixelWidth := 40  // Configurable unit size
+	unitPixelHeight := 40
+	
+	// Create environment
+	env := &Environment{
+		PixelWidth:  int32(unitPixelWidth * mapWidth),
+		PixelHeight: int32(unitPixelHeight * mapHeight),
+		UnitWidth:   int32(unitPixelWidth),
+		UnitHeight:  int32(unitPixelHeight),
+		MapWidth:    int32(mapWidth),
+		MapHeight:   int32(mapHeight),
+		Area:        make([]int8, mapWidth*mapHeight),
+	}
+	
+	// Read map data
+	row := 0
+	for scanner.Scan() && row < mapHeight {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		
+		values := strings.Fields(line)
+		if len(values) != mapWidth {
+			return nil, fmt.Errorf("row %d has %d values, expected %d", row, len(values), mapWidth)
+		}
+		
+		for col, valueStr := range values {
+			value, err := strconv.Atoi(valueStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid value at row %d, col %d: %w", row, col, err)
+			}
+			
+			env.Area[env.getMapIndex(col, row)] = int8(value)
+		}
+		
+		row++
+	}
+	
+	if row != mapHeight {
+		return nil, fmt.Errorf("expected %d rows, got %d", mapHeight, row)
+	}
+	
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading file: %w", err)
+	}
+	
+	return env, nil
 }
 
-// xLoc returns the x screen location given an x index
-func (e *Environment) xLoc(xIndex int) int32 {
-	return int32(xIndex) * e.xSize
+// getYPixelPosition returns the y screen location given a y map index
+func (e *Environment) getYPixelPosition(yIndex int) int32 {
+	return int32(yIndex) * e.UnitHeight
 }
 
-func (e *Environment) areaValue(xIndex, yIndex int) int8 {
-	if xIndex < 0 || yIndex < 0 || xIndex >= int(e.UnitWidth) || yIndex >= int(e.UnitHeight) {
+// getXPixelPosition returns the x screen location given an x map index
+func (e *Environment) getXPixelPosition(xIndex int) int32 {
+	return int32(xIndex) * e.UnitWidth
+}
+
+// getMapValue returns the map value at given coordinates, or -1 if out of bounds
+func (e *Environment) getMapValue(xIndex, yIndex int) int8 {
+	if xIndex < 0 || yIndex < 0 || xIndex >= int(e.MapWidth) || yIndex >= int(e.MapHeight) {
 		return -1
 	}
-	return e.Area[yIndex*int(e.UnitHeight)+xIndex]
+	return e.Area[e.getMapIndex(xIndex, yIndex)]
 }
 
-func (e *Environment) yIndex(yLoc float64) int {
-	return int(int32(yLoc) / e.ySize)
+// getYMapIndex converts y pixel coordinate to map index
+func (e *Environment) getYMapIndex(yPixel float64) int {
+	return int(int32(yPixel) / e.UnitHeight)
 }
 
-func (e *Environment) xIndex(xLoc float64) int {
-	return int(int32(xLoc) / e.xSize)
+// getXMapIndex converts x pixel coordinate to map index
+func (e *Environment) getXMapIndex(xPixel float64) int {
+	return int(int32(xPixel) / e.UnitWidth)
+}
+
+// getMapIndex converts 2D map coordinates to 1D array index
+func (e *Environment) getMapIndex(xIndex, yIndex int) int {
+	return yIndex*int(e.MapWidth) + xIndex
 }
 
 type Player struct {
@@ -154,7 +249,26 @@ func main() {
 	}
 	defer sdl.Quit()
 
-	env := NewEnvironment()
+	// Try to load map from file, fallback to default if not found
+	var env *Environment
+	var err error
+	
+	if len(os.Args) > 1 {
+		// Map file specified as command line argument
+		env, err = LoadEnvironmentFromFile(os.Args[1])
+		if err != nil {
+			fmt.Printf("Failed to load map file '%s': %v\n", os.Args[1], err)
+			fmt.Println("Using default map instead.")
+			env = NewEnvironment()
+		}
+	} else {
+		// Try to load default map file
+		env, err = LoadEnvironmentFromFile("map.txt")
+		if err != nil {
+			// Use hardcoded default map
+			env = NewEnvironment()
+		}
+	}
 
 	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 2*env.PixelWidth, env.PixelHeight, sdl.WINDOW_SHOWN)
 	if err != nil {
@@ -211,9 +325,9 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 	renderer.SetDrawColor(100, 100, 100, 255)
 	renderer.Clear()
 
-	// Determine the xBox the player is in
-	xBox := env.xIndex(pl.X)
-	yBox := env.yIndex(pl.Y)
+	// Determine the map coordinates the player is in
+	xBox := env.getXMapIndex(pl.X)
+	yBox := env.getYMapIndex(pl.Y)
 
 	renderer.SetViewport(&sdl.Rect{X: 0, Y: 0, W: env.PixelWidth, H: env.PixelHeight})
 	render2D(renderer, env, pl, xBox, yBox)
@@ -226,40 +340,43 @@ func render(renderer *sdl.Renderer, env *Environment, pl *Player) {
 
 func render3D(renderer *sdl.Renderer, env *Environment, pl *Player, xBox, yBox int) {
 
-	// 30 degrees of view
-	width := float64(env.PixelWidth) * IncrementsDegrees / FieldOfViewDegrees
+	// Calculate the width of each ray column based on field of view
+	width := float64(env.PixelWidth) * IncrementDegrees / FieldOfViewDegrees
 
 	x := 0
-	for offset := -FieldOfViewRads / 2; offset < FieldOfViewRads/2; offset += IncrementsRads {
-		_, _, distance, color, angle := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+offset, env)
+	// Cast rays across the field of view from left to right
+	for offset := -FieldOfViewRadians / 2; offset < FieldOfViewRadians/2; offset += IncrementRadians {
+		_, _, distance, color, wallAngle := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+offset, env)
 
-		// Lessen impact of angle
-		angle = math.Sqrt(angle)
+		// Apply angle-based shading (walls at sharper angles appear darker)
+		wallAngle = math.Sqrt(wallAngle)
 
-		// Add shading for the angle
-		color.R = uint8(float64(color.R) * angle)
-		color.G = uint8(float64(color.G) * angle)
-		color.B = uint8(float64(color.B) * angle)
+		// Modulate color intensity based on wall angle
+		color.R = uint8(float64(color.R) * wallAngle)
+		color.G = uint8(float64(color.G) * wallAngle)
+		color.B = uint8(float64(color.B) * wallAngle)
 
+		// Apply distance-based shading (further objects appear darker)
 		delta := float64(env.PixelWidth) - distance/2
 		if delta < 0 {
-			// This is _so_ far away we should make it black
+			// Object is too far away, skip rendering
 			continue
 		}
 
-		// Convert it to a ratio
-		darkness := delta / float64(env.PixelWidth)
+		// Calculate brightness ratio based on distance
+		brightness := delta / float64(env.PixelWidth)
 
-		// Darken further away items
-		color.R = uint8(float64(color.R) * darkness)
-		color.G = uint8(float64(color.G) * darkness)
-		color.B = uint8(float64(color.B) * darkness)
+		// Apply distance-based darkening
+		color.R = uint8(float64(color.R) * brightness)
+		color.G = uint8(float64(color.G) * brightness)
+		color.B = uint8(float64(color.B) * brightness)
 
 		renderer.SetDrawColor(color.R, color.G, color.B, color.A)
 
-		// Fix fish-eye
+		// Fix fish-eye distortion by correcting for viewing angle
 		distance *= math.Cos(offset)
 
+		// Calculate wall height on screen (closer walls appear taller)
 		height := float64(env.PixelHeight) / math.Log10(distance)
 
 		y := (float64(env.PixelHeight) - height) / 2.0
@@ -271,11 +388,11 @@ func render3D(renderer *sdl.Renderer, env *Environment, pl *Player, xBox, yBox i
 
 func render2D(renderer *sdl.Renderer, env *Environment, pl *Player, xBox, yBox int) {
 	// Draw the map
-	xUnit := env.PixelWidth / env.UnitWidth
-	yUnit := env.PixelHeight / env.UnitHeight
-	for yIndex := 0; yIndex < int(env.UnitHeight); yIndex++ {
-		for xIndex := 0; xIndex < int(env.UnitWidth); xIndex++ {
-			value := env.Area[yIndex*int(env.UnitHeight)+xIndex]
+	xUnit := env.PixelWidth / env.MapWidth
+	yUnit := env.PixelHeight / env.MapHeight
+	for yIndex := 0; yIndex < int(env.MapHeight); yIndex++ {
+		for xIndex := 0; xIndex < int(env.MapWidth); xIndex++ {
+			value := env.getMapValue(xIndex, yIndex)
 			color := colors[uint8(value)]
 
 			if value == 0 {
@@ -298,24 +415,27 @@ func render2D(renderer *sdl.Renderer, env *Environment, pl *Player, xBox, yBox i
 
 	renderer.SetDrawColor(255, 0, 0, 255)
 
-	for offset := -FieldOfViewRads / 2; offset < FieldOfViewRads/2; offset += IncrementsRads {
+	// Cast rays for 2D visualization
+	for offset := -FieldOfViewRadians / 2; offset < FieldOfViewRadians/2; offset += IncrementRadians {
 		xCollision, yCollision, _, _, _ := detectCollision(float64(pl.X), float64(pl.Y), xBox, yBox, pl.Angle+offset, env)
 		renderer.DrawLine(int32(pl.X), int32(pl.Y), xCollision, yCollision)
 	}
 }
 
+// detectCollision performs raycasting to find the nearest wall intersection
+// Returns collision coordinates, distance, wall color, and angle for shading
 func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environment) (collisionX, collisionY int32, collisionDistance float64, color Color, collisionAngle float64) {
 
 	var xSave, ySave, angleSave, distance float64
 	var colorSave Color
-	distance = 100_000_000
+	distance = 100_000_000 // Initialize to very large distance
 
-	yMax := int(env.PixelHeight / env.UnitHeight)
-	xMax := int(env.PixelWidth / env.UnitWidth)
+	yMax := int(env.MapHeight)
+	xMax := int(env.MapWidth)
 
 	tan := math.Tan(float64(angle))
 
-	// Normalize the angle
+	// Normalize the angle to [0, 2π] range
 	for angle > PI2 {
 		angle -= PI2
 	}
@@ -323,18 +443,17 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 		angle += PI2
 	}
 
+	// Cast ray in positive Y direction (downward)
 	if angle > 0 && angle < PI {
-		// fmt.Println("Positive Y")
-
-		// We want to find the intersection with the line below us which is owned by yBox+1
+		// Check horizontal grid lines below the player
 		for i := yBox + 1; i < yMax; i++ {
-			yDelta := float64(env.yLoc(i)) - y
+			yDelta := float64(env.getYPixelPosition(i)) - y
 			xDelta := yDelta / tan
 
-			xIndex := env.xIndex(x + xDelta)
-			yIndex := env.yIndex(y + yDelta)
+			xIndex := env.getXMapIndex(x + xDelta)
+			yIndex := env.getYMapIndex(y + yDelta)
 
-			value := env.areaValue(xIndex, yIndex)
+			value := env.getMapValue(xIndex, yIndex)
 			if value != 0 {
 				// Compute distance (no need to take sqrt ... yet)
 				dist := xDelta*xDelta + yDelta*yDelta
@@ -350,21 +469,20 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 				break
 			}
 		}
+	// Cast ray in negative Y direction (upward)
 	} else if angle > PI && angle < PI2 {
-		// fmt.Println("Negative Y")
-
-		// We want to find the intersection with the line above us which is owned by yBox
+		// Check horizontal grid lines above the player
 		for i := yBox; i >= 0; i-- {
-			yDelta := float64(env.yLoc(i)) - y
+			yDelta := float64(env.getYPixelPosition(i)) - y
 			xDelta := yDelta / tan
 
-			xIndex := env.xIndex(x + xDelta)
-			yIndex := env.yIndex(y + yDelta)
+			xIndex := env.getXMapIndex(x + xDelta)
+			yIndex := env.getYMapIndex(y + yDelta)
 
 			// Since yIndex is going to be on the line, the lines in front of us belong to the cubes in front of them.
 			yIndex--
 
-			value := env.areaValue(xIndex, yIndex)
+			value := env.getMapValue(xIndex, yIndex)
 			if value != 0 {
 				// Compute distance (no need to take sqrt ... yet)
 				dist := xDelta*xDelta + yDelta*yDelta
@@ -382,20 +500,20 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 		}
 	}
 
+	// Cast ray in negative X direction (leftward)
 	if angle > PI/2 && angle < 6*PI/4 {
-		// fmt.Println("Negative X")
-		// We want to find the intersection with the line before us which is owned by xBox
+		// Check vertical grid lines to the left of the player
 		for i := xBox; i >= 0; i-- {
-			xDelta := float64(env.xLoc(i)) - x
+			xDelta := float64(env.getXPixelPosition(i)) - x
 
-			// Compute the yDelta, subtract 0.0001 to counter roundoff
+			// Compute the yDelta
 			yDelta := xDelta * tan
 
-			xIndex := env.xIndex(x + xDelta)
-			yIndex := env.yIndex(y + yDelta)
+			xIndex := env.getXMapIndex(x + xDelta)
+			yIndex := env.getYMapIndex(y + yDelta)
 			xIndex--
 
-			value := env.areaValue(xIndex, yIndex)
+			value := env.getMapValue(xIndex, yIndex)
 			if value != 0 {
 				// Compute distance (no need to take sqrt ... yet)
 				dist := xDelta*xDelta + yDelta*yDelta
@@ -411,17 +529,17 @@ func detectCollision(x, y float64, xBox, yBox int, angle float64, env *Environme
 				break
 			}
 		}
+	// Cast ray in positive X direction (rightward)
 	} else if angle < PI/2 || angle > 6*PI/4 {
-		// fmt.Println("Positive X")
-		// We want to find the intersection with the line below us which is owned by yBox+1
+		// Check vertical grid lines to the right of the player
 		for i := xBox + 1; i < xMax; i++ {
-			xDelta := float64(env.yLoc(i)) - x
+			xDelta := float64(env.getXPixelPosition(i)) - x
 			yDelta := xDelta * tan
 
-			xIndex := env.xIndex(x + xDelta)
-			yIndex := env.yIndex(y + yDelta)
+			xIndex := env.getXMapIndex(x + xDelta)
+			yIndex := env.getYMapIndex(y + yDelta)
 
-			value := env.areaValue(xIndex, yIndex)
+			value := env.getMapValue(xIndex, yIndex)
 			if value != 0 {
 				// Compute distance (no need to take sqrt ... yet)
 				dist := xDelta*xDelta + yDelta*yDelta
